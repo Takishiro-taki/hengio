@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Đồng hồ & Hẹn giờ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@100..800&family=Orbitron:wght@400..900&family=Poppins:wght@100;200;300;400;500;600;700;800;900&family=Space+Grotesk:wght@300..700&display=swap">
+<style>
+/* ===== Biến giao diện: JS cập nhật các biến này khi người dùng tuỳ chỉnh ===== */
+:root{--text:#fff;--btn:#5b8def;--bar:#8ef0d2;--size:1;--weight:500;--font:'Space Grotesk',sans-serif}
+*{box-sizing:border-box;margin:0}
+body{min-height:100vh;display:grid;place-items:center;padding:24px 16px;font-family:var(--font);color:var(--text);overflow-x:hidden}
+
+/* Hiệu ứng kính mờ (glassmorphism) */
+.glass{background:rgba(255,255,255,.13);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);border:1px solid rgba(255,255,255,.28);box-shadow:0 10px 40px rgba(0,0,0,.28)}
+.app{width:min(580px,100%);display:grid;gap:18px}
+.card{padding:28px 22px;text-align:center}
+.clock-card{border-radius:36px;padding-block:38px}
+.timer-card{border-radius:22px}
+.label{font-size:.9rem;opacity:.8}
+
+#clock{font-size:calc(clamp(2.8rem,15vw,5.6rem)*var(--size));font-weight:var(--weight);font-variant-numeric:tabular-nums;line-height:1.15;margin:6px 0}
+#date{opacity:.85;text-transform:capitalize}
+
+.inputs{display:flex;justify-content:center;gap:10px;margin:16px 0 8px}
+.inputs label{display:grid;gap:4px;font-size:.8rem;opacity:.9}
+input[type=number]{width:78px;padding:10px 6px;text-align:center;font:inherit;font-size:1.3rem;color:var(--text);background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);border-radius:12px;outline:none}
+input[type=number]:focus-visible{border-color:var(--btn);box-shadow:0 0 0 3px color-mix(in srgb,var(--btn) 40%,transparent)}
+input:disabled{opacity:.5}
+#tDisplay{font-size:calc(clamp(2.2rem,10vw,3.6rem)*var(--size));font-weight:var(--weight);font-variant-numeric:tabular-nums}
+.bar{height:10px;margin:12px 0 18px;border-radius:99px;background:rgba(255,255,255,.18);overflow:hidden}
+.bar i{display:block;height:100%;width:100%;background:var(--bar);border-radius:99px;transition:width .15s linear}
+
+button{font:inherit;cursor:pointer;color:#fff;border:0;border-radius:14px;padding:11px 22px;background:var(--btn);transition:transform .15s,filter .15s}
+button:hover{filter:brightness(1.12)}
+button:active{transform:scale(.96)}
+button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+button.ghost{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3)}
+.btns,.chips{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+.chips{margin-top:14px}
+.chips button{padding:6px 14px;font-size:.85rem}
+#gear{position:fixed;top:16px;right:16px;width:46px;height:46px;padding:0;display:grid;place-items:center;border-radius:50%}
+
+/* ===== Hết giờ: màn hình rung + chớp nháy ===== */
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-8px)}80%{transform:translateX(8px)}}
+@keyframes flash{0%,100%{opacity:0}50%{opacity:.55}}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none}
+body.ringing .app{animation:shake .5s infinite}
+body.ringing #flash{animation:flash .7s infinite}
+@media (prefers-reduced-motion:reduce){body.ringing .app{animation:none}}
+
+/* ===== Bảng cài đặt (màu cố định để luôn dễ đọc trên mọi nền) ===== */
+dialog{margin:auto;width:min(480px,94vw);max-height:90vh;padding:0;overflow:auto;color:#fff;background:rgba(18,18,32,.8);border:1px solid rgba(255,255,255,.2);border-radius:24px;backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);font-family:'Inter',sans-serif}
+dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(4px)}
+.panel{padding:22px}
+.panel h2{display:flex;justify-content:space-between;align-items:center;font-size:1.2rem;margin-bottom:6px}
+.panel h2 button{padding:6px 12px}
+.panel section{display:grid;gap:12px;padding:16px 0;border-top:1px solid rgba(255,255,255,.14)}
+.panel h3{font-size:.95rem;font-weight:600}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:.92rem}
+.row input[type=range]{width:55%;accent-color:#5b8def}
+.row input[type=color]{width:46px;height:30px;padding:0;border:0;background:none;cursor:pointer}
+.row select,.row input[type=text]{width:55%;padding:7px 9px;font:inherit;color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:10px}
+.row select option{color:#000}
+.row input[type=file]{width:55%;font-size:.8rem}
+.grads{display:flex;gap:8px;flex-wrap:wrap}
+.grads button{width:46px;height:30px;padding:0;border:2px solid rgba(255,255,255,.45)}
+</style>
+</head>
+<body>
+<div id="flash"></div>
+
+<button id="gear" class="glass" aria-label="Mở cài đặt">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+</button>
+
+<main class="app">
+  <section class="card glass clock-card">
+    <div class="label">Giờ Việt Nam (UTC+7)</div>
+    <div id="clock">--:--:--</div>
+    <div id="date"></div>
+  </section>
+
+  <section class="card glass timer-card">
+    <div class="label">Hẹn giờ &amp; đếm ngược</div>
+    <div class="inputs">
+      <label>Giờ<input id="h" type="number" min="0" max="99" value="0"></label>
+      <label>Phút<input id="m" type="number" min="0" max="59" value="5"></label>
+      <label>Giây<input id="s" type="number" min="0" max="59" value="0"></label>
+    </div>
+    <div id="tDisplay">00:05:00</div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="btns">
+      <button id="go">Bắt đầu</button>
+      <button id="reset" class="ghost">Đặt lại</button>
+    </div>
+    <div class="chips">
+      <button class="ghost" data-m="1">1 phút</button>
+      <button class="ghost" data-m="5">5 phút</button>
+      <button class="ghost" data-m="10">10 phút</button>
+      <button class="ghost" data-m="25">25 phút</button>
+    </div>
+  </section>
+</main>
+
+<audio id="alarm" loop preload="auto"></audio>
+
+<dialog id="dlg"><div class="panel">
+  <h2>Cài đặt giao diện <button id="close" class="ghost" aria-label="Đóng">✕</button></h2>
+
+  <section><h3>Hình nền</h3>
+    <div class="row">Màu nền <input type="color" data-k="bgColor"></div>
+    <div><div style="margin-bottom:8px;font-size:.92rem">Dải màu gradient</div><div class="grads" id="grads"></div></div>
+    <div class="row">Link ảnh nền <input type="text" data-k="bgUrl" placeholder="https://..."></div>
+    <div class="row">Tải ảnh lên <input type="file" id="bgFile" accept="image/*"></div>
+  </section>
+
+  <section><h3>Đồng hồ và chữ số</h3>
+    <div class="row">Font chữ
+      <select data-k="font">
+        <option value="'Space Grotesk',sans-serif">Space Grotesk</option>
+        <option value="'Inter',sans-serif">Inter</option>
+        <option value="'Poppins',sans-serif">Poppins</option>
+        <option value="'Orbitron',sans-serif">Orbitron</option>
+        <option value="'JetBrains Mono',monospace">JetBrains Mono</option>
+      </select></div>
+    <div class="row">Kích thước số <input type="range" data-k="size" min=".6" max="1.6" step=".05"></div>
+    <div class="row">Độ đậm <input type="range" data-k="weight" min="100" max="900" step="100"></div>
+  </section>
+
+  <section><h3>Màu sắc</h3>
+    <div class="row">Màu chữ đồng hồ <input type="color" data-k="text"></div>
+    <div class="row">Màu nút bấm <input type="color" data-k="btn"></div>
+    <div class="row">Màu thanh tiến trình <input type="color" data-k="bar"></div>
+  </section>
+
+  <section><h3>Âm thanh báo hết giờ</h3>
+    <div class="row">Chuông <select id="sound" data-k="sound"></select></div>
+    <div class="row">Âm lượng <input type="range" data-k="vol" min="0" max="1" step=".05"></div>
+    <button id="test" class="ghost">Nghe thử</button>
+  </section>
+
+  <button id="defaults" class="ghost">Khôi phục mặc định</button>
+</div></dialog>
+
+<script>
+/* ================= 1. Dữ liệu & cài đặt ================= */
+const $ = s => document.querySelector(s);
+const TZ = 'Asia/Ho_Chi_Minh';          // Múi giờ cố định: giờ Việt Nam (UTC+7)
+const KEY = 'clock-app-v1';             // Khoá lưu cài đặt trong localStorage
+
+// 3 âm thanh mẫu (file .ogg từ Google Actions Sounds)
+const SOUNDS = [
+  ['Chuông báo thức',  'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'],
+  ['Đồng hồ điện tử',  'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'],
+  ['Tiếng bíp',        'https://actions.google.com/sounds/v1/alarms/beep_short.ogg']
+];
+const GRADS = [
+  'linear-gradient(135deg,#14213d,#3a2a5e 55%,#c2527a)',
+  'linear-gradient(135deg,#0f2027,#203a43,#2c5364)',
+  'linear-gradient(135deg,#2b1055,#7597de)',
+  'linear-gradient(135deg,#0b3d2e,#7fd1ae)',
+  'linear-gradient(135deg,#e8eef7,#b9c8e6)'
+];
+const DEF = {bgMode:'gradient',bgColor:'#14213d',bgGrad:0,bgUrl:'',font:"'Space Grotesk',sans-serif",
+             size:1,weight:500,text:'#ffffff',btn:'#5b8def',bar:'#8ef0d2',sound:0,vol:.7};
+let S = {...DEF};
+try { Object.assign(S, JSON.parse(localStorage.getItem(KEY))); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }; // ảnh upload quá lớn có thể không lưu được
+
+/* ================= 2. Áp dụng cài đặt lên giao diện ================= */
+const alarm = $('#alarm');
+function apply() {
+  const st = document.documentElement.style;
+  st.setProperty('--text', S.text);  st.setProperty('--btn', S.btn);  st.setProperty('--bar', S.bar);
+  st.setProperty('--font', S.font);  st.setProperty('--size', S.size); st.setProperty('--weight', S.weight);
+
+  const b = document.body.style;
+  b.background = S.bgMode === 'color' ? S.bgColor
+    : S.bgMode === 'url' && S.bgUrl ? `#111 url("${S.bgUrl.replace(/"/g, '%22')}") center/cover no-repeat`
+    : GRADS[S.bgGrad];
+  b.backgroundAttachment = 'fixed';
+
+  const src = SOUNDS[S.sound][1];
+  if (alarm.getAttribute('src') !== src) alarm.src = src;
+  alarm.volume = S.vol;
+}
+// Đổ giá trị cài đặt vào các ô trong bảng cài đặt
+function syncUI() {
+  document.querySelectorAll('[data-k]').forEach(el => {
+    const v = String(S[el.dataset.k]);
+    el.value = v.startsWith('data:') ? '' : v;
+  });
+}
+
+// Tạo danh sách chuông và nút chọn gradient
+$('#sound').innerHTML = SOUNDS.map((x, i) => `<option value="${i}">${x[0]}</option>`).join('');
+GRADS.forEach((g, i) => {
+  const b = document.createElement('button');
+  b.style.background = g; b.setAttribute('aria-label', 'Gradient ' + (i + 1));
+  b.onclick = () => { S.bgGrad = i; S.bgMode = 'gradient'; apply(); save(); };
+  $('#grads').append(b);
+});
+
+// Mọi ô có data-k tự cập nhật S[k] và áp dụng ngay (xem trước trực tiếp)
+document.querySelectorAll('[data-k]').forEach(el => {
+  el.addEventListener(el.type === 'text' ? 'change' : 'input', () => {
+    const k = el.dataset.k;
+    S[k] = (el.type === 'range' || k === 'sound') ? +el.value : el.value;
+    if (k === 'bgColor') S.bgMode = 'color';
+    if (k === 'bgUrl') S.bgMode = S.bgUrl ? 'url' : 'gradient';
+    apply(); save();
+  });
+});
+
+// Tải ảnh nền từ máy: đọc thành data URL
+$('#bgFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { S.bgUrl = r.result; S.bgMode = 'url'; syncUI(); apply(); save(); };
+  r.readAsDataURL(f);
+};
+$('#defaults').onclick = () => { S = {...DEF}; syncUI(); apply(); save(); };
+$('#gear').onclick = () => $('#dlg').showModal();
+$('#close').onclick = () => $('#dlg').close();
+$('#dlg').onclick = e => { if (e.target === $('#dlg')) $('#dlg').close(); }; // bấm ra ngoài để đóng
+
+/* ================= 3. Đồng hồ thời gian thực (giờ Việt Nam) ================= */
+// Intl.DateTimeFormat với timeZone cố định nên luôn ra giờ VN dù múi giờ của thiết bị bị sai.
+const tFmt = new Intl.DateTimeFormat('en-GB', {timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'});
+const dFmt = new Intl.DateTimeFormat('vi-VN', {timeZone: TZ, weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'});
+
+// (Tuỳ chọn) Đồng bộ với máy chủ thời gian để bù nếu đồng hồ hệ thống bị lệch. Lỗi mạng thì bỏ qua.
+let offset = 0;
+fetch(`https://worldtimeapi.org/api/timezone/${TZ}`).then(r => r.json())
+  .then(d => { if (d.unixtime) offset = d.unixtime * 1000 - Date.now(); }).catch(() => {});
+
+function renderClock() {
+  const d = new Date(Date.now() + offset), t = tFmt.format(d);
+  if (t !== $('#clock').textContent) { $('#clock').textContent = t; $('#date').textContent = dFmt.format(d); }
+}
+
+/* ================= 4. Hẹn giờ & đếm ngược ================= */
+let total = 0,       // tổng thời gian (ms); 0 = chưa bắt đầu
+    remain = 0,      // thời gian còn lại (ms)
+    endAt = 0,       // mốc thời điểm kết thúc (ms, theo Date.now())
+    running = false, ringing = false, fb = null;
+
+const pad = n => String(n).padStart(2, '0');
+const hms = ms => { const t = Math.ceil(ms / 1000); return `${pad(t / 3600 | 0)}:${pad(t % 3600 / 60 | 0)}:${pad(t % 60)}`; };
+const val = id => Math.max(0, +$('#' + id).value || 0);
+const readInputs = () => (val('h') * 3600 + val('m') * 60 + val('s')) * 1000;
+
+function renderTimer() {
+  $('#tDisplay').textContent = hms(total ? remain : readInputs());
+  $('#bar').style.width = (total ? remain / total * 100 : 100) + '%';
+}
+function ui() {
+  $('#go').textContent = ringing ? 'Tắt chuông' : running ? 'Tạm dừng' : total ? 'Tiếp tục' : 'Bắt đầu';
+  ['h', 'm', 's'].forEach(id => $('#' + id).disabled = !!total);
+  if (!running) document.title = 'Đồng hồ & Hẹn giờ';
+  renderTimer();
+}
+
+$('#go').onclick = () => {
+  if (ringing) return reset();
+  if (running) { remain = Math.max(0, endAt - Date.now()); running = false; }  // tạm dừng
+  else {
+    if (!total) { total = remain = readInputs(); if (!total) return; }          // lần bắt đầu đầu tiên
+    endAt = Date.now() + remain; running = true;                                // bắt đầu / tiếp tục
+  }
+  ui();
+};
+function reset() {
+  running = ringing = false; total = remain = 0;
+  alarm.pause(); alarm.currentTime = 0; clearInterval(fb); fb = null;
+  document.body.classList.remove('ringing');
+  navigator.vibrate && navigator.vibrate(0);
+  ui();
+}
+$('#reset').onclick = reset;
+['h', 'm', 's'].forEach(id => $('#' + id).oninput = renderTimer);
+document.querySelectorAll('.chips button').forEach(b => b.onclick = () => {
+  if (total) return;
+  $('#h').value = 0; $('#m').value = b.dataset.m; $('#s').value = 0; renderTimer();
+});
+
+// Hết giờ: phát chuông lặp lại, rung/chớp màn hình, rung điện thoại
+function finish() {
+  running = false; remain = 0; ringing = true;
+  document.body.classList.add('ringing');
+  alarm.currentTime = 0; alarm.play().catch(startFallback);
+  navigator.vibrate && navigator.vibrate([400, 200, 400, 200, 400]);
+  ui();
+}
+// Nếu file âm thanh không tải được (mất mạng...) thì dùng tiếng bíp tạo bằng Web Audio
+let ctx;
+function beep() {
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); ctx.resume();
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.frequency.value = 880; g.gain.value = S.vol * .5;
+  o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + .25);
+}
+function startFallback() { if (ringing && !fb) fb = setInterval(beep, 600); }
+alarm.onerror = startFallback;
+$('#test').onclick = () => {
+  if (ringing) return;
+  alarm.currentTime = 0; alarm.play().catch(beep);
+  setTimeout(() => { if (!ringing) alarm.pause(); }, 2500);
+};
+
+/* ================= 5. Vòng lặp chính ================= */
+// Thời gian còn lại luôn tính từ mốc endAt (Date.now()), KHÔNG cộng dồn từng nhịp,
+// nên setInterval có trễ hoặc tab bị làm chậm khi chạy nền thì kết quả vẫn chính xác.
+function tick() {
+  renderClock();
+  if (running) {
+    remain = Math.max(0, endAt - Date.now());
+    renderTimer();
+    document.title = hms(remain) + ' - Hẹn giờ';
+    if (!remain) finish();
+  }
+}
+syncUI(); apply(); ui(); tick();
+setInterval(tick, 100);
+</script>
+</body>
+</html>
