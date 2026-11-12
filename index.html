@@ -2,15 +2,17 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Đồng hồ & Hẹn giờ</title>
+<!-- Icon tab trình duyệt (favicon): SVG nhúng thẳng, không cần file ngoài -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2314213d'/%3E%3Cstop offset='1' stop-color='%23c2527a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='%23fff' stroke-opacity='.85' stroke-width='4'/%3E%3Cpath d='M32 20v12l8 5' fill='none' stroke='%238ef0d2' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@100..800&family=Orbitron:wght@400..900&family=Poppins:wght@100;200;300;400;500;600;700;800;900&family=Space+Grotesk:wght@300..700&display=swap">
 <style>
 /* ===== Biến giao diện: JS cập nhật các biến này khi người dùng tuỳ chỉnh ===== */
 :root{--text:#fff;--btn:#5b8def;--bar:#8ef0d2;--size:1;--weight:500;--font:'Space Grotesk',sans-serif}
 *{box-sizing:border-box;margin:0}
-body{min-height:100vh;display:grid;place-items:center;padding:24px 16px;font-family:var(--font);color:var(--text);overflow-x:hidden}
+body{min-height:100vh;display:grid;place-items:center;padding:max(24px,env(safe-area-inset-top,0px)) 16px max(24px,env(safe-area-inset-bottom,0px));font-family:var(--font);color:var(--text);overflow-x:hidden}
 
 /* Hiệu ứng kính mờ (glassmorphism) */
 .glass{background:rgba(255,255,255,.13);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);border:1px solid rgba(255,255,255,.28);box-shadow:0 10px 40px rgba(0,0,0,.28)}
@@ -40,7 +42,16 @@ button.ghost{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,
 .btns,.chips{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
 .chips{margin-top:14px}
 .chips button{padding:6px 14px;font-size:.85rem}
-#gear{position:fixed;top:16px;right:16px;width:46px;height:46px;padding:0;display:grid;place-items:center;border-radius:50%}
+#gear{position:fixed;top:calc(16px + env(safe-area-inset-top,0px));right:16px;width:46px;height:46px;padding:0;display:grid;place-items:center;border-radius:50%}
+
+/* ===== Nhạc nền YouTube ===== */
+.music-card{border-radius:22px;display:grid;gap:12px}
+.yt-row{display:flex;gap:8px}
+.yt-row input{flex:1;min-width:0;padding:10px 12px;font:inherit;color:var(--text);background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);border-radius:12px;outline:none}
+.yt-row input::placeholder{color:var(--text);opacity:.55}
+.yt-row input:focus-visible{border-color:var(--btn)}
+#ytFrame{width:100%;aspect-ratio:16/9;border:0;border-radius:14px;background:#000}
+#ytMsg:empty{display:none}
 
 /* ===== Hết giờ: màn hình rung + chớp nháy ===== */
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-8px)}80%{transform:translateX(8px)}}
@@ -102,9 +113,17 @@ dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(4px)}
       <button class="ghost" data-m="25">25 phút</button>
     </div>
   </section>
+  <section class="card glass music-card">
+    <div class="label">Nhạc nền (YouTube)</div>
+    <div class="yt-row">
+      <input id="yt" type="text" data-k="yt" placeholder="Dán link YouTube vào đây" aria-label="Link YouTube">
+      <button id="ytGo">Phát</button>
+    </div>
+    <div class="row">Âm lượng <input type="range" data-k="musicVol" min="0" max="1" step=".05"></div>
+    <div id="ytMsg" class="label"></div>
+    <iframe id="ytFrame" hidden allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" title="Trình phát nhạc nền"></iframe>
+  </section>
 </main>
-
-<audio id="alarm" loop preload="auto"></audio>
 
 <dialog id="dlg"><div class="panel">
   <h2>Cài đặt giao diện <button id="close" class="ghost" aria-label="Đóng">✕</button></h2>
@@ -112,7 +131,6 @@ dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(4px)}
   <section><h3>Hình nền</h3>
     <div class="row">Màu nền <input type="color" data-k="bgColor"></div>
     <div><div style="margin-bottom:8px;font-size:.92rem">Dải màu gradient</div><div class="grads" id="grads"></div></div>
-    <div class="row">Link ảnh nền <input type="text" data-k="bgUrl" placeholder="https://..."></div>
     <div class="row">Tải ảnh lên <input type="file" id="bgFile" accept="image/*"></div>
   </section>
 
@@ -150,11 +168,12 @@ const $ = s => document.querySelector(s);
 const TZ = 'Asia/Ho_Chi_Minh';          // Múi giờ cố định: giờ Việt Nam (UTC+7)
 const KEY = 'clock-app-v1';             // Khoá lưu cài đặt trong localStorage
 
-// 3 âm thanh mẫu (file .ogg từ Google Actions Sounds)
+// 3 âm thanh báo thức tạo trực tiếp bằng Web Audio (trang đã đăng không tải được file âm thanh từ site khác)
+// [tên, dạng sóng, các nốt (Hz), độ dài mỗi nốt (giây), chu kỳ lặp (giây)]
 const SOUNDS = [
-  ['Chuông báo thức',  'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'],
-  ['Đồng hồ điện tử',  'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'],
-  ['Tiếng bíp',        'https://actions.google.com/sounds/v1/alarms/beep_short.ogg']
+  ['Chuông báo thức', 'square',   [880, 660, 880, 660], .12, 1.2],
+  ['Đồng hồ điện tử', 'sine',     [1400, 1400, 1400],   .08, 1],
+  ['Tiếng bíp',       'triangle', [740],                .3,  .7]
 ];
 const GRADS = [
   'linear-gradient(135deg,#14213d,#3a2a5e 55%,#c2527a)',
@@ -164,13 +183,12 @@ const GRADS = [
   'linear-gradient(135deg,#e8eef7,#b9c8e6)'
 ];
 const DEF = {bgMode:'gradient',bgColor:'#14213d',bgGrad:0,bgUrl:'',font:"'Space Grotesk',sans-serif",
-             size:1,weight:500,text:'#ffffff',btn:'#5b8def',bar:'#8ef0d2',sound:0,vol:.7};
+             size:1,weight:500,text:'#ffffff',btn:'#5b8def',bar:'#8ef0d2',sound:0,vol:.7,yt:'',musicVol:.5};
 let S = {...DEF};
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY))); } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }; // ảnh upload quá lớn có thể không lưu được
 
 /* ================= 2. Áp dụng cài đặt lên giao diện ================= */
-const alarm = $('#alarm');
 function apply() {
   const st = document.documentElement.style;
   st.setProperty('--text', S.text);  st.setProperty('--btn', S.btn);  st.setProperty('--bar', S.bar);
@@ -181,10 +199,7 @@ function apply() {
     : S.bgMode === 'url' && S.bgUrl ? `#111 url("${S.bgUrl.replace(/"/g, '%22')}") center/cover no-repeat`
     : GRADS[S.bgGrad];
   b.backgroundAttachment = 'fixed';
-
-  const src = SOUNDS[S.sound][1];
-  if (alarm.getAttribute('src') !== src) alarm.src = src;
-  alarm.volume = S.vol;
+  if (musicOn) ytCmd('setVolume', [S.musicVol * 100]);
 }
 // Đổ giá trị cài đặt vào các ô trong bảng cài đặt
 function syncUI() {
@@ -231,10 +246,8 @@ $('#dlg').onclick = e => { if (e.target === $('#dlg')) $('#dlg').close(); }; // 
 const tFmt = new Intl.DateTimeFormat('en-GB', {timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'});
 const dFmt = new Intl.DateTimeFormat('vi-VN', {timeZone: TZ, weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'});
 
-// (Tuỳ chọn) Đồng bộ với máy chủ thời gian để bù nếu đồng hồ hệ thống bị lệch. Lỗi mạng thì bỏ qua.
+// Trang đã đăng không gọi được máy chủ thời gian bên ngoài nên không có đồng bộ; giờ VN vẫn đúng nhờ múi giờ cố định.
 let offset = 0;
-fetch(`https://worldtimeapi.org/api/timezone/${TZ}`).then(r => r.json())
-  .then(d => { if (d.unixtime) offset = d.unixtime * 1000 - Date.now(); }).catch(() => {});
 
 function renderClock() {
   const d = new Date(Date.now() + offset), t = tFmt.format(d);
@@ -273,10 +286,12 @@ $('#go').onclick = () => {
   ui();
 };
 function reset() {
+  const wasRinging = ringing;
   running = ringing = false; total = remain = 0;
-  alarm.pause(); alarm.currentTime = 0; clearInterval(fb); fb = null;
+  clearInterval(fb); fb = null;
   document.body.classList.remove('ringing');
   navigator.vibrate && navigator.vibrate(0);
+  if (wasRinging && musicOn) ytCmd('playVideo');   // bật lại nhạc nền sau khi tắt chuông
   ui();
 }
 $('#reset').onclick = reset;
@@ -290,25 +305,63 @@ document.querySelectorAll('.chips button').forEach(b => b.onclick = () => {
 function finish() {
   running = false; remain = 0; ringing = true;
   document.body.classList.add('ringing');
-  alarm.currentTime = 0; alarm.play().catch(startFallback);
+  if (musicOn) ytCmd('pauseVideo');                // tạm dừng nhạc nền để nghe rõ chuông
+  playOnce(S.sound); fb = setInterval(() => playOnce(S.sound), SOUNDS[S.sound][4] * 1000);
   navigator.vibrate && navigator.vibrate([400, 200, 400, 200, 400]);
   ui();
 }
-// Nếu file âm thanh không tải được (mất mạng...) thì dùng tiếng bíp tạo bằng Web Audio
+// Phát một lượt chuông: mỗi nốt là một oscillator có độ vang tắt dần
 let ctx;
-function beep() {
+function playOnce(i) {
+  const [, type, notes, len] = SOUNDS[i];
   ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); ctx.resume();
-  const o = ctx.createOscillator(), g = ctx.createGain();
-  o.frequency.value = 880; g.gain.value = S.vol * .5;
-  o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + .25);
+  notes.forEach((f, n) => {
+    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + n * len * 1.5;
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(Math.max(S.vol * .4, .001), t);
+    g.gain.exponentialRampToValueAtTime(.001, t + len);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + len);
+  });
 }
-function startFallback() { if (ringing && !fb) fb = setInterval(beep, 600); }
-alarm.onerror = startFallback;
-$('#test').onclick = () => {
-  if (ringing) return;
-  alarm.currentTime = 0; alarm.play().catch(beep);
-  setTimeout(() => { if (!ringing) alarm.pause(); }, 2500);
+$('#test').onclick = () => playOnce(S.sound);
+
+/* ================= 4.5 Nhạc nền từ link YouTube ================= */
+// Không tách riêng được file âm thanh từ YouTube, nên dùng trình phát nhúng chính thức (iframe) và điều khiển bằng postMessage.
+let musicOn = false;
+
+// Đổi link YouTube thành phần đường dẫn nhúng. Hỗ trợ youtube.com/watch?v=, youtu.be/, shorts, music.youtube.com và danh sách phát (list=).
+function ytEmbed(link) {
+  let u; try { u = new URL(link.trim()); } catch (e) { return null; }
+  const h = u.hostname.replace(/^(www|m|music)\./, '');
+  if (h !== 'youtube.com' && h !== 'youtu.be') return null;
+  const id = h === 'youtu.be' ? u.pathname.slice(1)
+    : u.searchParams.get('v') || (u.pathname.match(/^\/(?:shorts|embed|live)\/([\w-]{11})/) || [])[1];
+  if (/^[\w-]{11}$/.test(id || '')) return `${id}?loop=1&playlist=${id}`;     // 1 video, lặp lại
+  const list = u.searchParams.get('list');
+  return list ? `videoseries?list=${encodeURIComponent(list)}&loop=1` : null;  // danh sách phát
+}
+function ytCmd(func, args = []) {
+  const w = $('#ytFrame').contentWindow;
+  w && w.postMessage(JSON.stringify({event: 'command', func, args}), '*');
+}
+$('#ytGo').onclick = () => {
+  const f = $('#ytFrame');
+  if (musicOn) {                                   // đang phát -> dừng
+    f.src = 'about:blank'; f.hidden = true; musicOn = false; $('#ytGo').textContent = 'Phát'; return;
+  }
+  const q = ytEmbed($('#yt').value);
+  if (!q) { $('#ytMsg').textContent = 'Link YouTube không hợp lệ.'; return; }
+  $('#ytMsg').textContent = '';
+  f.hidden = false; musicOn = true; $('#ytGo').textContent = 'Dừng';
+  f.src = `https://www.youtube-nocookie.com/embed/${q}&autoplay=1&enablejsapi=1`;
+  // Player cần vài giây mới sẵn sàng nhận lệnh, nên gửi lệnh chỉnh âm lượng vài lần
+  f.onload = () => [0, 1000, 2500].forEach(t => setTimeout(() => musicOn && ytCmd('setVolume', [S.musicVol * 100]), t));
 };
+$('#yt').onkeydown = e => { if (e.key === 'Enter' && !musicOn) $('#ytGo').click(); };
+// Nếu môi trường chặn iframe từ site khác (vd. trang đăng trực tuyến) thì báo rõ thay vì để khung trống
+document.addEventListener('securitypolicyviolation', e => {
+  if (/frame/.test(e.violatedDirective)) $('#ytMsg').textContent = 'Trang này chặn nhúng YouTube. Hãy mở file index.html trên máy bạn (nên chạy bằng Live Server của VS Code).';
+});
 
 /* ================= 5. Vòng lặp chính ================= */
 // Thời gian còn lại luôn tính từ mốc endAt (Date.now()), KHÔNG cộng dồn từng nhịp,
